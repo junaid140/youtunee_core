@@ -89,18 +89,28 @@ class Content {
 
 class NextSearch {
   String query;
+  String mode;
   String params;
+  String? browseId;
   String? ctoken;
 
   NextSearch({
     required this.query,
+    this.mode = 'search',
     this.params = '',
+    this.browseId,
     this.ctoken,
   });
 
   @override
   String toString() {
-    return {'query': query, 'params': params, 'ctoken': ctoken}.toString();
+    return {
+      'query': query,
+      'mode': mode,
+      'browseId': browseId,
+      'params': params,
+      'ctoken': ctoken,
+    }.toString();
   }
 }
 
@@ -238,6 +248,33 @@ class PlayableItem {
       'thumbnail': thumbnail,
       'duration': duration,
       'streamUrl': streamUrl,
+    }.toString();
+  }
+}
+
+class Profile {
+  String id;
+  String name;
+  List<TextComponentDetail> about;
+  String image;
+  List<CategorizedContent> contents;
+
+  Profile({
+    required this.id,
+    required this.name,
+    required this.about,
+    required this.image,
+    required this.contents,
+  });
+
+  @override
+  String toString() {
+    return {
+      'id': id,
+      'name': name,
+      'about': about,
+      'image': image,
+      'contents': contents,
     }.toString();
   }
 }

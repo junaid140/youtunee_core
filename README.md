@@ -11,5 +11,5 @@ Wrap YouTube Music API to get and listening music with no ads.
 - Get playable stream [✅]
 - Get item detail [✅]
 - Get lyrics [✅]
-- Get profile [❌]
-    - Show more in profile [❌]
+- Get profile [✅]
+    - Show more in profile [✅]

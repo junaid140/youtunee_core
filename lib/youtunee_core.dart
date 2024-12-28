@@ -1,12 +1,11 @@
 import 'dart:convert';
-import 'dart:ffi';
 import 'package:http/http.dart' as http;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yed;
 import 'package:youtunee_core/str.dart';
 import 'package:youtunee_core/typings.dart';
 
 class Youtunee {
-  Map<String, String> headers = {
+  final Map<String, String> _headers = {
     'accept':
         'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
     'accept-language': 'id-ID,id;q=0.9',
@@ -18,33 +17,43 @@ class Youtunee {
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
   };
 
-  RegExp initialDataRegExp = RegExp(
+  final RegExp _initialDataRegExp = RegExp(
     r"initialData\.push\({path: '\\\/browse', params: JSON\.parse\('([^']+)'\), data: '([^']+)'}\);",
   );
-  RegExp innertubeContextRegExp = RegExp(
+  final RegExp _innertubeContextRegExp = RegExp(
     r'"INNERTUBE_CONTEXT":{(.+)},"INNERTUBE_CONTEXT_CLIENT_NAME"',
   );
 
-  Map<String, dynamic> innertubeContext = {};
+  Map<String, dynamic> _innertubeContext = {};
 
   Future<Map<String, dynamic>> getOrSetContext() async {
-    if (innertubeContext['client'] != null) return innertubeContext;
+    if (_innertubeContext['client'] != null) return _innertubeContext;
 
     final client = http.Client();
     final response = await client.get(
       Uri.https('music.youtube.com'),
-      headers: headers,
+      headers: _headers,
     );
     if (response.statusCode != 200) return {};
 
-    final matched = innertubeContextRegExp.firstMatch(response.body);
+    final matched = _innertubeContextRegExp.firstMatch(response.body);
     if (matched == null) return {};
 
     final rawStringData = matched.group(1);
     if (rawStringData == null) return {};
 
-    innertubeContext = jsonDecode("{$rawStringData}");
-    return innertubeContext;
+    _innertubeContext = jsonDecode("{$rawStringData}");
+    return _innertubeContext;
+  }
+
+  String _getThumbnail(dynamic thumbnails) {
+    final tmpThumbnail = (thumbnails as List).last['url'] as String;
+    final thumbnail = tmpThumbnail.startsWith('https://i.ytimg.com')
+        ? tmpThumbnail
+        : tmpThumbnail
+            .replaceFirst(RegExp(r"=w\d+"), '=w512')
+            .replaceFirst(RegExp(r"-h\d+"), '-h512');
+    return thumbnail;
   }
 
   Content parseContent(dynamic item) {
@@ -57,12 +66,9 @@ class Youtunee {
     final runs = TextComponentDetail.create(tmpRuns);
     final title = runs.first;
     final subtitle = runs.sublist(1);
-    final tmpThumbnail = (item['thumbnail']['musicThumbnailRenderer']
-            ['thumbnail']['thumbnails'] as List)
-        .last['url'] as String;
-    final thumbnail = tmpThumbnail.startsWith('https://i.ytimg.com')
-        ? tmpThumbnail
-        : tmpThumbnail.replaceFirst(RegExp(r"=w\d+-h\d+"), '=w512-h512');
+    final thumbnail = _getThumbnail(
+      item['thumbnail']['musicThumbnailRenderer']['thumbnail']['thumbnails'],
+    );
 
     if (item['navigationEndpoint'] != null) {
       final browserEndpoint = item['navigationEndpoint']['browseEndpoint'];
@@ -88,11 +94,11 @@ class Youtunee {
     final client = http.Client();
     final response = await client.get(
       Uri.https('music.youtube.com'),
-      headers: headers,
+      headers: _headers,
     );
     if (response.statusCode != 200) return null;
 
-    final matched = initialDataRegExp.firstMatch(response.body);
+    final matched = _initialDataRegExp.firstMatch(response.body);
     if (matched == null) return null;
 
     final rawStringData = matched.group(2);
@@ -116,6 +122,7 @@ class Youtunee {
         final musicCarousel =
             carouselShelfsData[i]['musicCarouselShelfRenderer'];
         if (musicCarousel == null) continue;
+
         content.category = musicCarousel['header']
                 ['musicCarouselShelfBasicHeaderRenderer']['title']['runs'][0]
             ['text'];
@@ -140,14 +147,10 @@ class Youtunee {
                   .where((r) => r != null)
                   .toList(),
             );
-            final tmpThumbnail = (mtrir['thumbnailRenderer']
-                        ['musicThumbnailRenderer']['thumbnail']['thumbnails']
-                    as List)
-                .last['url'] as String;
-            final thumbnail = tmpThumbnail.startsWith('https://i.ytimg.com')
-                ? tmpThumbnail
-                : tmpThumbnail.replaceFirst(
-                    RegExp(r"=w\d+-h\d+"), '=w512-h512');
+            final thumbnail = _getThumbnail(
+              mtrir['thumbnailRenderer']['musicThumbnailRenderer']['thumbnail']
+                  ['thumbnails'],
+            );
 
             content.contents.add(
               Content(
@@ -170,6 +173,8 @@ class Youtunee {
 
   Future<List<CategorizedContent>?> search({
     required String query,
+    String mode = 'search',
+    String browseId = '',
     String? ctoken,
     String? params,
   }) async {
@@ -193,28 +198,40 @@ class Youtunee {
       if (params != null && params.isNotEmpty) {
         requestBody['params'] = params;
       }
+      if (mode == 'browse' && browseId.isNotEmpty) {
+        requestBody['browseId'] = browseId;
+      }
     }
 
     final url = Uri.https(
       'music.youtube.com',
-      '/youtubei/v1/search',
+      '/youtubei/v1/$mode',
       queryParams,
     );
     final client = http.Client();
     final response = await client.post(
       url,
-      headers: headers,
+      headers: _headers,
       body: jsonEncode(requestBody),
     );
     if (response.statusCode != 200) return null;
 
     final jsonData = jsonDecode(response.body);
     if (jsonData['contents'] != null) {
-      final slr = jsonData['contents']['tabbedSearchResultsRenderer']['tabs'][0]
-          ['tabRenderer']['content']['sectionListRenderer']['contents'];
+      final slr = jsonData['contents']['tabbedSearchResultsRenderer'] != null
+          ? jsonData['contents']['tabbedSearchResultsRenderer']['tabs'][0]
+              ['tabRenderer']['content']['sectionListRenderer']['contents']
+          : jsonData['contents']['singleColumnBrowseResultsRenderer'] != null
+              ? jsonData['contents']['singleColumnBrowseResultsRenderer']
+                      ['tabs'][0]['tabRenderer']['content']
+                  ['sectionListRenderer']['contents']
+              : null;
+      if (slr == null) return null;
+
       List<CategorizedContent> result = [];
 
       for (var i = 0; i < (slr as List<dynamic>).length; i++) {
+        final mpsr = slr[i]['musicPlaylistShelfRenderer'];
         final mcsr = slr[i]['musicCardShelfRenderer'];
         final msr = slr[i]['musicShelfRenderer'];
 
@@ -242,7 +259,7 @@ class Youtunee {
         if (msr != null) {
           final category = msr['title']['runs'][0]['text'];
           List<Content> contents = [];
-          NextSearch next = NextSearch(query: '');
+          NextSearch next = NextSearch(query: '', mode: mode);
 
           if (msr['bottomEndpoint'] != null &&
               msr['bottomEndpoint']['searchEndpoint'] != null) {
@@ -271,14 +288,50 @@ class Youtunee {
             ),
           );
         }
+
+        if (mpsr != null) {
+          List<Content> contents = [];
+          NextSearch next = NextSearch(query: '', mode: mode);
+
+          if (mpsr['bottomEndpoint'] != null &&
+              mpsr['bottomEndpoint']['searchEndpoint'] != null) {
+            next.query = mpsr['bottomEndpoint']['searchEndpoint']['query'];
+            next.params = mpsr['bottomEndpoint']['searchEndpoint']['params'];
+          }
+
+          if (mpsr['continuations'] != null) {
+            next.params = mpsr['continuations'][0]['nextContinuationData']
+                ['clickTrackingParams'];
+            next.ctoken = mpsr['continuations'][0]['nextContinuationData']
+                ['continuation'];
+          }
+
+          for (var j = 0; j < mpsr['contents'].length; j++) {
+            final item = mpsr['contents'][j];
+            final mrlir = item['musicResponsiveListItemRenderer'];
+
+            contents.add(parseContent(mrlir));
+          }
+          result.add(
+            CategorizedContent(
+              category: '',
+              contents: contents,
+              next: next,
+            ),
+          );
+        }
       }
+
       return result;
     }
 
     if (jsonData['continuationContents'] != null) {
-      final msc = jsonData['continuationContents']['musicShelfContinuation'];
+      var msc = jsonData['continuationContents']['musicShelfContinuation'] ??
+          jsonData['continuationContents']['musicPlaylistShelfContinuation'];
+      if (msc == null) return null;
+
       List<Content> contents = [];
-      NextSearch next = NextSearch(query: query);
+      NextSearch next = NextSearch(query: query, mode: mode);
 
       if (msc['continuations'] != null) {
         next.params = msc['continuations'][0]['nextContinuationData']
@@ -306,19 +359,28 @@ class Youtunee {
     return null;
   }
 
-  Future<Playlist?> getPlaylistItems(String playlistId) async {
+  Future<Playlist?> getPlaylistItems({
+    required String playlistId,
+    String mode = 'playlist',
+  }) async {
     final client = http.Client();
+    final url = mode == 'playlist'
+        ? Uri.https(
+            'music.youtube.com',
+            '/playlist',
+            {'list': playlistId},
+          )
+        : Uri.https(
+            'music.youtube.com',
+            '/browse/$playlistId',
+          );
     final response = await client.get(
-      Uri.https(
-        'music.youtube.com',
-        '/playlist',
-        {'list': playlistId},
-      ),
-      headers: headers,
+      url,
+      headers: _headers,
     );
     if (response.statusCode != 200) return null;
 
-    final matched = initialDataRegExp.firstMatch(response.body);
+    final matched = _initialDataRegExp.firstMatch(response.body);
     if (matched == null) return null;
 
     final rawStringData = matched.group(2);
@@ -345,29 +407,34 @@ class Youtunee {
             : TextComponentDetail.create(mrhr['secondSubtitle']['runs']);
     final List<TextComponentDetail> description = mrhr['description'] == null
         ? []
-        : TextComponentDetail.create(mrhr['description']
-                ['musicDescriptionShelfRenderer']['description']['runs'] ??
-            []);
-    final tmpThumbnail = (mrhr['thumbnail']['musicThumbnailRenderer']
-            ['thumbnail']['thumbnails'] as List)
-        .last['url'] as String;
-    final thumbnail = tmpThumbnail.startsWith('https://i.ytimg.com')
-        ? tmpThumbnail
-        : tmpThumbnail.replaceFirst(RegExp(r"=w\d+-h\d+"), '=w512-h512');
+        : TextComponentDetail.create(
+            mrhr['description']['musicDescriptionShelfRenderer']['description']
+                    ['runs'] ??
+                [],
+          );
+    final thumbnail = _getThumbnail(
+      mrhr['thumbnail']['musicThumbnailRenderer']['thumbnail']['thumbnails'],
+    );
     List<Content> contents = [];
 
     for (var i = 0; i < slrc.length; i++) {
-      if (slrc[i]['musicResponsiveListItemRenderer'] != null) {
-        final item = slrc[i]['musicResponsiveListItemRenderer'];
-        final tmpRuns1 = (item['flexColumns'] as List<dynamic>)
-            .map((fc) =>
-                fc['musicResponsiveListItemFlexColumnRenderer']['text']['runs'])
+      final mrir = slrc[i]['musicResponsiveListItemRenderer'];
+      final mmrlir = slrc[i]['musicMultiRowListItemRenderer'];
+      
+      if (mrir != null) {
+        final tmpRuns1 = (mrir['flexColumns'] as List<dynamic>)
+            .map(
+              (fc) => fc['musicResponsiveListItemFlexColumnRenderer']['text']
+                  ['runs'],
+            )
             .where((r) => r != null)
             .expand((i) => i)
             .toList();
-        final tmpRuns2 = (item['fixedColumns'] as List<dynamic>)
-            .map((fc) => fc['musicResponsiveListItemFixedColumnRenderer']
-                ['text']['runs'])
+        final tmpRuns2 = (mrir['fixedColumns'] as List<dynamic>)
+            .map(
+              (fc) => fc['musicResponsiveListItemFixedColumnRenderer']['text']
+                  ['runs'],
+            )
             .where((r) => r != null)
             .expand((i) => i)
             .toList();
@@ -386,20 +453,17 @@ class Youtunee {
         );
       }
 
-      if (slrc[i]['musicMultiRowListItemRenderer'] != null) {
-        final item = slrc[i]['musicMultiRowListItemRenderer'];
-        final id = item['onTap']['watchEndpoint']['videoId'];
-        final title = TextComponentDetail.create(item['title']['runs']).first;
-        final subtitle = TextComponentDetail.create(item['subtitle']['runs']);
+      if (mmrlir != null) {
+        final id = mmrlir['onTap']['watchEndpoint']['videoId'];
+        final title = TextComponentDetail.create(mmrlir['title']['runs']).first;
+        final subtitle = TextComponentDetail.create(mmrlir['subtitle']['runs']);
         final description = TextComponentDetail.create(
-          item['description']['runs'],
+          mmrlir['description']['runs'],
         );
-        final tmpThumbnail = (item['thumbnail']['musicThumbnailRenderer']
-                ['thumbnail']['thumbnails'] as List)
-            .last['url'] as String;
-        final thumbnail = tmpThumbnail.startsWith('https://i.ytimg.com')
-            ? tmpThumbnail
-            : tmpThumbnail.replaceFirst(RegExp(r"=w\d+-h\d+"), '=w512-h512');
+        final thumbnail = _getThumbnail(
+          mmrlir['thumbnail']['musicThumbnailRenderer']['thumbnail']
+              ['thumbnails'],
+        );
 
         title.id = id;
 
@@ -449,7 +513,7 @@ class Youtunee {
         '/youtubei/v1/next',
         {'prettyPrint': 'false'},
       ),
-      headers: headers,
+      headers: _headers,
       body: jsonEncode(requestBody),
     );
     if (response.statusCode != 200) return null;
@@ -491,11 +555,7 @@ class Youtunee {
       final id = item['navigationEndpoint']['watchEndpoint']['videoId'];
       final title = runs.first;
       final subtitle = runs.sublist(1);
-      final tmpThumbnail =
-          (item['thumbnail']['thumbnails'] as List).last['url'] as String;
-      final thumbnail = tmpThumbnail.startsWith('https://i.ytimg.com')
-          ? tmpThumbnail
-          : tmpThumbnail.replaceFirst(RegExp(r"=w\d+-h\d+"), '=w512-h512');
+      final thumbnail = _getThumbnail(item['thumbnail']['thumbnails']);
 
       queue.add(
         Content(
@@ -519,7 +579,7 @@ class Youtunee {
     );
   }
 
-  Future<Lyrics?> getLyricsWithBrowse(String browseId) async {
+  Future<Lyrics?> _getLyricsWithBrowse(String browseId) async {
     final context = await getOrSetContext();
     Map<String, dynamic> requestBody = {
       'context': context,
@@ -531,7 +591,7 @@ class Youtunee {
       Uri.parse(
         'https://music.youtube.com/youtubei/v1/browse?prettyPrint=false',
       ),
-      headers: headers,
+      headers: _headers,
       body: jsonEncode(requestBody),
     );
     if (response.statusCode != 200) return null;
@@ -563,7 +623,7 @@ class Youtunee {
         '/youtubei/v1/next',
         {'prettyPrint': 'false'},
       ),
-      headers: headers,
+      headers: _headers,
       body: jsonEncode(requestBody),
     );
     if (response.statusCode != 200) return null;
@@ -577,7 +637,7 @@ class Youtunee {
     if (hasLyrics != null && !(hasLyrics as bool)) return null;
 
     String lyricsBrowseId = wntrrTabs['endpoint']['browseEndpoint']['browseId'];
-    return await getLyricsWithBrowse(lyricsBrowseId);
+    return await _getLyricsWithBrowse(lyricsBrowseId);
   }
 
   Future<PlayableItem?> getContent(String itemId) async {
@@ -594,7 +654,7 @@ class Youtunee {
         '/youtubei/v1/player',
         {'prettyPrint': 'false'},
       ),
-      headers: headers,
+      headers: _headers,
       body: jsonEncode(requestBody),
     );
     if (response.statusCode != 200) return null;
@@ -606,11 +666,7 @@ class Youtunee {
     final title = TextComponentDetail(text: vd['title']);
     final author = TextComponentDetail(
         text: vd['author'], id: vd['channelId'], type: 'user_channel');
-    final tmpThumbnail =
-        (vd['thumbnail']['thumbnails'] as List).last['url'] as String;
-    final thumbnail = tmpThumbnail.startsWith('https://i.ytimg.com')
-        ? tmpThumbnail
-        : tmpThumbnail.replaceFirst(RegExp(r"=w\d+-h\d+"), '=w512-h512');
+    final thumbnail = _getThumbnail(vd['thumbnail']['thumbnails']);
     final duration = int.parse((vd['lengthSeconds'] as String));
 
     return PlayableItem(
@@ -633,5 +689,128 @@ class Youtunee {
 
     item.streamUrl = audio.first.url;
     return item;
+  }
+
+  Future<Profile?> getProfile(String profileId) async {
+    final context = await getOrSetContext();
+    final responseBody = {
+      'context': context,
+      'browseId': profileId,
+    };
+
+    final client = http.Client();
+    final response = await client.post(
+      Uri.https(
+        'music.youtube.com',
+        '/youtubei/v1/browse',
+        {'prettyPrint': 'false'},
+      ),
+      headers: _headers,
+      body: jsonEncode(responseBody),
+    );
+    if (response.statusCode != 200) return null;
+
+    final jsonData = jsonDecode(response.body);
+    final header = jsonData['header']['musicImmersiveHeaderRenderer'];
+    final contentsz = jsonData['contents']['singleColumnBrowseResultsRenderer']
+            ['tabs'][0]['tabRenderer']['content']['sectionListRenderer']
+        ['contents'];
+    final name = header['title']['runs'][0]['text'];
+    final about = TextComponentDetail.create(header['description']['runs']);
+    final image = (header['thumbnail']['musicThumbnailRenderer']['thumbnail']
+            ['thumbnails'] as List)
+        .last['url'];
+
+    List<CategorizedContent> contents = [];
+    for (var i = 0; i < (contentsz as List).length; i++) {
+      final msr = contentsz[i]['musicShelfRenderer'];
+      final mcsr = contentsz[i]['musicCarouselShelfRenderer'];
+
+      if (msr != null) {
+        final category = msr['title']['runs'][0]['text'];
+        NextSearch next = NextSearch(
+          query: '',
+          mode: 'browse',
+          browseId: msr['bottomEndpoint']['browseEndpoint']['browseId'],
+          params: msr['bottomEndpoint']['browseEndpoint']['params'],
+        );
+        List<Content> ct = [];
+
+        for (var j = 0; j < (msr['contents'] as List).length; j++) {
+          final item = msr['contents'][j]['musicResponsiveListItemRenderer'];
+          ct.add(parseContent(item));
+        }
+
+        contents.add(
+          CategorizedContent(
+            category: category,
+            contents: ct,
+            next: next,
+          ),
+        );
+      }
+
+      if (mcsr != null) {
+        final header = mcsr['header']['musicCarouselShelfBasicHeaderRenderer'];
+        final category = header['title']['runs'][0]['text'];
+
+        final moreButton = header['moreContentButton'];
+        NextSearch next = NextSearch(
+          query: '',
+          mode: 'browse',
+          browseId: moreButton == null
+              ? null
+              : moreButton['buttonRenderer']['navigationEndpoint']
+                  ['browseEndpoint']['browseId'],
+          params: moreButton == null
+              ? ''
+              : moreButton['buttonRenderer']['navigationEndpoint']
+                  ['browseEndpoint']['params'],
+        );
+        List<Content> ct = [];
+
+        for (var j = 0; j < (mcsr['contents'] as List).length; j++) {
+          final mtrir = mcsr['contents'][j]['musicTwoRowItemRenderer'];
+          final title = TextComponentDetail.create(
+            (mtrir['title']['runs'] as List).where((r) => r != null).toList(),
+          ).first;
+          final subtitle = TextComponentDetail.create(
+            (mtrir['subtitle']['runs'] as List)
+                .where((r) => r != null)
+                .toList(),
+          );
+          final thumbnail = _getThumbnail(
+            mtrir['thumbnailRenderer']['musicThumbnailRenderer']['thumbnail']
+                ['thumbnails'],
+          );
+
+          ct.add(
+            Content(
+              id: title.id ?? '',
+              type: title.type ?? '',
+              thumbnail: thumbnail,
+              title: title,
+              subtitle: subtitle,
+            ),
+          );
+        }
+
+        contents.add(
+          CategorizedContent(
+            category: category,
+            contents: ct,
+            next: next,
+          ),
+        );
+      }
+    }
+
+    return Profile(
+      id: profileId,
+      name: name,
+      about: about,
+      image: image,
+      contents: contents,
+    );
   }
 }
