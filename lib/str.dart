@@ -41,7 +41,8 @@ String unescape(String input) {
           break;
         }
         if (input[i + 1] == '{') {
-          final match = RegExp(r"{([a-fA-F0-9]+)}").firstMatch(input.substring(i + 1));
+          final match =
+              RegExp(r"{([a-fA-F0-9]+)}").firstMatch(input.substring(i + 1));
           if (match == null) {
             break;
           }

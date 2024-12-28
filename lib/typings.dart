@@ -1,51 +1,55 @@
 class TextComponentDetail {
-    String text;
-    String? type;
-    String? id;
+  String text;
+  String? type;
+  String? id;
 
-    TextComponentDetail({
-        required this.text,
-        this.id,
-        this.type,
-    });
+  TextComponentDetail({
+    required this.text,
+    this.id,
+    this.type,
+  });
 
-    static List<TextComponentDetail> create(dynamic runs) {
-        List<TextComponentDetail> tcds = [];
+  static List<TextComponentDetail> create(dynamic runs) {
+    List<TextComponentDetail> tcds = [];
 
-        for (var i = 0; i < runs.length; i++) {
-            TextComponentDetail tcd = TextComponentDetail(text: "");
-            final run = runs[i];
-            tcd.text = run['text'];
-            final navigationEndpoint = run['navigationEndpoint'];
-            if(navigationEndpoint != null) {
-                final watchEndpoint = navigationEndpoint['watchEndpoint'];
-                final browseEndpoint = navigationEndpoint['browseEndpoint'];
-                if(watchEndpoint != null) {
-                    tcd.type = 'watch';
-                }
-                if(browseEndpoint != null) {
-                    final pageType = browseEndpoint['browseEndpointContextSupportedConfigs']['browseEndpointContextMusicConfig']['pageType'] as String?;
-                    if(pageType != null) {
-                        tcd.type = pageType.replaceAll("MUSIC_PAGE_TYPE_", "").toLowerCase();
-                    }
-                }
-
-                tcd.id = watchEndpoint != null 
-                    ? watchEndpoint['videoId']
-                    : browseEndpoint != null 
-                        ? browseEndpoint['browseId']
-                        : null;
-                
-                if(tcd.type == 'playlist' && tcd.id != null) {
-                    tcd.id = (tcd.id ?? '').replaceFirst('VL', '').replaceFirst('MPSP', '');
-                }
-            }
-
-            tcds.add(tcd);
+    for (var i = 0; i < runs.length; i++) {
+      TextComponentDetail tcd = TextComponentDetail(text: "");
+      final run = runs[i];
+      tcd.text = run['text'];
+      final navigationEndpoint = run['navigationEndpoint'];
+      if (navigationEndpoint != null) {
+        final watchEndpoint = navigationEndpoint['watchEndpoint'];
+        final browseEndpoint = navigationEndpoint['browseEndpoint'];
+        if (watchEndpoint != null) {
+          tcd.type = 'watch';
+        }
+        if (browseEndpoint != null) {
+          final pageType =
+              browseEndpoint['browseEndpointContextSupportedConfigs']
+                  ['browseEndpointContextMusicConfig']['pageType'] as String?;
+          if (pageType != null) {
+            tcd.type =
+                pageType.replaceAll("MUSIC_PAGE_TYPE_", "").toLowerCase();
+          }
         }
 
-        return tcds;
+        tcd.id = watchEndpoint != null
+            ? watchEndpoint['videoId']
+            : browseEndpoint != null
+                ? browseEndpoint['browseId']
+                : null;
+
+        if (tcd.type == 'playlist' && tcd.id != null) {
+          tcd.id =
+              (tcd.id ?? '').replaceFirst('VL', '').replaceFirst('MPSP', '');
+        }
+      }
+
+      tcds.add(tcd);
     }
+
+    return tcds;
+  }
 
   @override
   String toString() {
@@ -54,25 +58,32 @@ class TextComponentDetail {
 }
 
 class Content {
-    String id;
-    String type;
-    String thumbnail;
-    List<TextComponentDetail> description = [];
-    TextComponentDetail title;
-    List<TextComponentDetail> subtitle;
+  String id;
+  String type;
+  String thumbnail;
+  List<TextComponentDetail> description = [];
+  TextComponentDetail title;
+  List<TextComponentDetail> subtitle;
 
-    Content({
-        required this.id, 
-        required this.type, 
-        required this.thumbnail, 
-        required this.title,
-        required this.subtitle,
-        this.description = const [], 
-    });
+  Content({
+    required this.id,
+    required this.type,
+    required this.thumbnail,
+    required this.title,
+    required this.subtitle,
+    this.description = const [],
+  });
 
-    @override
+  @override
   String toString() {
-    return {'id': id, 'type': type, 'thumbnail': thumbnail, 'title': title, 'subtitle': subtitle, 'description': description}.toString();
+    return {
+      'id': id,
+      'type': type,
+      'thumbnail': thumbnail,
+      'title': title,
+      'subtitle': subtitle,
+      'description': description
+    }.toString();
   }
 }
 
@@ -106,7 +117,11 @@ class CategorizedContent {
 
   @override
   String toString() {
-    return {'category': category, 'contents': contents, 'next': next}.toString();
+    return {
+      'category': category,
+      'contents': contents,
+      'next': next,
+    }.toString();
   }
 }
 
@@ -131,14 +146,22 @@ class Playlist {
 
   @override
   String toString() {
-    return {'id': id, 'title': title, 'subtitle': subtitle, 'secondSubtitle': secondSubtitle, 'description': description, 'thumbnail': thumbnail, 'contents': contents}.toString();
+    return {
+      'id': id,
+      'title': title,
+      'subtitle': subtitle,
+      'secondSubtitle': secondSubtitle,
+      'description': description,
+      'thumbnail': thumbnail,
+      'contents': contents
+    }.toString();
   }
 }
 
 class CurrentLyrics {
   final bool available;
   final String? browseId;
-  
+
   CurrentLyrics({
     required this.available,
     required this.browseId,
@@ -165,7 +188,12 @@ class Queue {
 
   @override
   String toString() {
-    return {'index': index, 'playlistId': playlistId, 'lyrics': lyrics, 'queue': queue}.toString();
+    return {
+      'index': index,
+      'playlistId': playlistId,
+      'lyrics': lyrics,
+      'queue': queue
+    }.toString();
   }
 }
 
