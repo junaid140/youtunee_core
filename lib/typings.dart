@@ -211,3 +211,33 @@ class Lyrics {
     return {'lyrics': lyrics, 'footer': footer}.toString();
   }
 }
+
+class PlayableItem {
+  String id;
+  TextComponentDetail title;
+  TextComponentDetail author;
+  String thumbnail;
+  int duration;
+  Uri? streamUrl;
+
+  PlayableItem({
+    required this.id,
+    required this.title,
+    required this.author,
+    required this.thumbnail,
+    required this.duration,
+    this.streamUrl,
+  });
+
+  @override
+  String toString() {
+    return {
+      'id': id,
+      'title': title,
+      'author': author,
+      'thumbnail': thumbnail,
+      'duration': duration,
+      'streamUrl': streamUrl,
+    }.toString();
+  }
+}
