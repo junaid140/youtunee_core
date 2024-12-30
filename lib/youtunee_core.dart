@@ -51,8 +51,8 @@ class Youtunee {
     final thumbnail = tmpThumbnail.startsWith('https://i.ytimg.com')
         ? tmpThumbnail
         : tmpThumbnail
-            .replaceFirst(RegExp(r"=w\d+"), '=w512')
-            .replaceFirst(RegExp(r"-h\d+"), '-h512');
+            .replaceFirst(RegExp(r"=w\d+-h\d+"), '=w512-h512')
+            .replaceFirst(RegExp(r"=w\d+-c-h\d+"), '=w512-c-h512');
     return thumbnail;
   }
 

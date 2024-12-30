@@ -7,3 +7,7 @@
 
 - Add top card search.
 - Add profile search.
+
+## 0.0.2+1
+
+- Fix broken thumbnail url.
