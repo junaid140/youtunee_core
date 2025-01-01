@@ -12,7 +12,7 @@ dependencies:
   youtube_explode_dart: 
     git:
       url: https://github.com/Hexer10/youtube_explode_dart.git
-      ref: e519db6
+      ref: master
 
 dev_dependencies:
   lints: ^5.0.0

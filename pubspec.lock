@@ -474,7 +474,7 @@ packages:
     dependency: "direct main"
     description:
       path: "."
-      ref: e519db6
+      ref: master
       resolved-ref: e519db65ad0b0a40b12f69285932f9db509da3cf
       url: "https://github.com/Hexer10/youtube_explode_dart.git"
     source: git
