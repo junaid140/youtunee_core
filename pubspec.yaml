@@ -1,6 +1,6 @@
 name: youtunee_core
 description: Wrap YouTube Music API to get and listening music with no ads.
-version: 0.0.2+1
+version: 0.0.3
 repository: https://github.com/navetacandra/youtunee_core
 
 environment:
