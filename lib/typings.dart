@@ -9,7 +9,7 @@ class TextComponentDetail {
     this.type,
   });
 
-  static List<TextComponentDetail> create(dynamic runs) {
+  static List<TextComponentDetail> create(List<Map<String, dynamic>> runs) {
     List<TextComponentDetail> tcds = [];
 
     for (var i = 0; i < runs.length; i++) {
@@ -24,12 +24,9 @@ class TextComponentDetail {
           tcd.type = 'watch';
         }
         if (browseEndpoint != null) {
-          final pageType =
-              browseEndpoint['browseEndpointContextSupportedConfigs']
-                  ['browseEndpointContextMusicConfig']['pageType'] as String?;
+          final pageType = browseEndpoint['browseEndpointContextSupportedConfigs']['browseEndpointContextMusicConfig']['pageType'] as String?;
           if (pageType != null) {
-            tcd.type =
-                pageType.replaceAll("MUSIC_PAGE_TYPE_", "").toLowerCase();
+            tcd.type = pageType.replaceAll("MUSIC_PAGE_TYPE_", "").toLowerCase();
           }
         }
 
@@ -40,8 +37,7 @@ class TextComponentDetail {
                 : null;
 
         if (tcd.type == 'playlist' && tcd.id != null) {
-          tcd.id =
-              (tcd.id ?? '').replaceFirst('VL', '').replaceFirst('MPSP', '');
+          tcd.id = (tcd.id ?? '').replaceFirst('VL', '').replaceFirst('MPSP', '');
         }
       }
 
@@ -51,9 +47,13 @@ class TextComponentDetail {
     return tcds;
   }
 
+  Map<String, dynamic> toMap() {
+    return {'text': text, 'id': id, 'type': type};
+  }
+
   @override
   String toString() {
-    return {'text': text, 'id': id, 'type': type}.toString();
+    return toMap().toString();
   }
 }
 
@@ -74,16 +74,40 @@ class Content {
     this.description = const [],
   });
 
-  @override
-  String toString() {
+  Map<String, dynamic> toMap() {
     return {
       'id': id,
       'type': type,
       'thumbnail': thumbnail,
-      'title': title,
-      'subtitle': subtitle,
-      'description': description
-    }.toString();
+      'title': title.toMap(),
+      'subtitle': subtitle.map((subtitle) => subtitle.toMap()).toList(),
+      'description': description.map((description) => description.toMap()).toList(),
+    };
+  }
+
+  @override
+  String toString() {
+    return toMap().toString();
+  }
+
+  static Content create(Map<String, dynamic> data) {
+    final id = data['id'] ?? '';
+    final type = data['type'] ?? '';
+    final thumbnail = data['thumbnail'] ?? '';
+    final title = TextComponentDetail.create(
+      [data['title'] ?? {}].map((d) => d as Map<String, dynamic>).toList(),
+    ).first;
+    final subtitle = TextComponentDetail.create((data['subtitle'] ?? []));
+    final description = TextComponentDetail.create((data['description'] ?? []));
+
+    return Content(
+      id: id,
+      type: type,
+      thumbnail: thumbnail,
+      title: title,
+      subtitle: subtitle,
+      description: description,
+    );
   }
 }
 
@@ -102,15 +126,35 @@ class NextSearch {
     this.ctoken,
   });
 
-  @override
-  String toString() {
+  Map<String, dynamic> toMap() {
     return {
       'query': query,
       'mode': mode,
       'browseId': browseId,
       'params': params,
       'ctoken': ctoken,
-    }.toString();
+    };
+  }
+
+  @override
+  String toString() {
+    return toMap().toString();
+  }
+
+  static NextSearch create(Map<String, dynamic> data) {
+    final String query = data['query'] ?? '';
+    final String mode = data['mode'] ?? '';
+    final String params = data['params'] ?? '';
+    final String? browseId = data['browseId'];
+    final String? ctoken = data['ctoken'];
+
+    return NextSearch(
+      query: query,
+      mode: mode,
+      params: params,
+      browseId: browseId,
+      ctoken: ctoken,
+    );
   }
 }
 
@@ -125,13 +169,33 @@ class CategorizedContent {
     this.next,
   });
 
-  @override
-  String toString() {
+  Map<String, dynamic> toMap() {
     return {
       'category': category,
-      'contents': contents,
-      'next': next,
-    }.toString();
+      'contents': contents.map((content) => content.toMap()).toList(),
+      'next': next?.toMap(),
+    };
+  }
+
+  @override
+  String toString() {
+    return toMap().toString();
+  }
+
+  static CategorizedContent create(Map<String, dynamic> data) {
+    final String category = data['category'] ?? '';
+    final NextSearch? next = data['next'] ? NextSearch.create(data['next']) : null;
+    final List<Content> contents = ((data['contents'] ?? []) as List<Map<String, dynamic>>)
+        .map(
+          (content) => Content.create(content),
+        )
+        .toList();
+
+    return CategorizedContent(
+      category: category,
+      contents: contents,
+      next: next,
+    );
   }
 }
 
@@ -143,6 +207,7 @@ class Playlist {
   List<TextComponentDetail> description;
   String thumbnail;
   List<Content> contents;
+  NextSearch? nextSearch;
 
   Playlist({
     required this.id,
@@ -152,73 +217,118 @@ class Playlist {
     required this.description,
     required this.thumbnail,
     required this.contents,
+    this.nextSearch,
   });
 
-  @override
-  String toString() {
+  Map<String, dynamic> toMap() {
     return {
       'id': id,
       'title': title,
-      'subtitle': subtitle,
-      'secondSubtitle': secondSubtitle,
-      'description': description,
+      'subtitle': subtitle.map((subtitle) => subtitle.toMap()).toList(),
+      'secondSubtitle': secondSubtitle.map((secondSubtitle) => secondSubtitle.toMap()).toList(),
+      'description': description.map((description) => description.toMap()).toList(),
       'thumbnail': thumbnail,
-      'contents': contents
-    }.toString();
+      'contents': contents.map((content) => content.toMap()).toList(),
+      'nextSearch': nextSearch?.toMap(),
+    };
   }
-}
-
-class CurrentLyrics {
-  final bool available;
-  final String? browseId;
-
-  CurrentLyrics({
-    required this.available,
-    required this.browseId,
-  });
 
   @override
   String toString() {
-    return {'available': available, 'browseId': browseId}.toString();
+    return toMap().toString();
+  }
+
+  static Playlist create(Map<String, dynamic> data) {
+    String id = data['id'] ?? '';
+    String thumbnail = data['thumbnail'] ?? '';
+    TextComponentDetail title = TextComponentDetail.create(
+      [data['title'] ?? {}].map((d) => d as Map<String, dynamic>).toList(),
+    ).first;
+    List<TextComponentDetail> subtitle = TextComponentDetail.create((data['subtitle'] ?? []));
+    List<TextComponentDetail> secondSubtitle = TextComponentDetail.create((data['secondSubtitle'] ?? []));
+    List<TextComponentDetail> description = TextComponentDetail.create((data['description'] ?? []));
+    List<Content> contents = ((data['contents'] ?? []) as List<Map<String, dynamic>>)
+        .map(
+          (content) => Content.create(content),
+        )
+        .toList();
+
+    return Playlist(
+      id: id,
+      title: title,
+      subtitle: subtitle,
+      secondSubtitle: secondSubtitle,
+      description: description,
+      thumbnail: thumbnail,
+      contents: contents,
+    );
   }
 }
 
 class Queue {
-  final int index;
-  final String playlistId;
-  final CurrentLyrics lyrics;
-  final List<Content> queue;
+  int index;
+  String playlistId;
+  List<Content> queue;
 
   Queue({
     required this.index,
     required this.playlistId,
-    required this.lyrics,
     required this.queue,
   });
 
-  @override
-  String toString() {
+  Map<String, dynamic> toMap() {
     return {
       'index': index,
       'playlistId': playlistId,
-      'lyrics': lyrics,
-      'queue': queue
-    }.toString();
+      'queue': queue.map((content) => content.toMap()).toList(),
+    };
+  }
+
+  @override
+  String toString() {
+    return toMap().toString();
+  }
+
+  static Queue create(Map<String, dynamic> data) {
+    final index = data['index'] ?? -1;
+    final playlistId = data['playlistId'] ?? '';
+    final List<Content> queue = ((data['queue'] ?? []) as List<Map<String, dynamic>>)
+        .map(
+          (content) => Content.create(content),
+        )
+        .toList();
+
+    return Queue(
+      index: index,
+      playlistId: playlistId,
+      queue: queue,
+    );
   }
 }
 
 class Lyrics {
-  final String lyrics;
-  final String footer;
+  String lyrics;
+  String footer;
 
   Lyrics({
     required this.lyrics,
     required this.footer,
   });
 
+  Map<String, dynamic> toMap() {
+    return {'lyrics': lyrics, 'footer': footer};
+  }
+
   @override
   String toString() {
-    return {'lyrics': lyrics, 'footer': footer}.toString();
+    return toMap().toString();
+  }
+
+  static create(Map<String, dynamic> data) {
+    return Lyrics(
+      lyrics: data['lyrics'] ?? '',
+      footer: data['footer'] ?? '',
+    );
   }
 }
 
@@ -239,16 +349,42 @@ class PlayableItem {
     this.streamUrl,
   });
 
-  @override
-  String toString() {
+  Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'title': title,
-      'author': author,
+      'title': title.toMap(),
+      'author': author.toMap(),
       'thumbnail': thumbnail,
       'duration': duration,
-      'streamUrl': streamUrl,
-    }.toString();
+      'streamUrl': streamUrl.toString(),
+    };
+  }
+
+  @override
+  String toString() {
+    return toMap().toString();
+  }
+
+  static PlayableItem create(Map<String, dynamic> data) {
+    final String id = data['id'] ?? '';
+    final String thumbnail = data['thumbnail'] ?? '';
+    final int duration = data['duration'] ?? 0;
+    final Uri? streamUrl = data['streamUrl'] ? Uri.parse(data['streamUrl'] ?? '') : null;
+    final TextComponentDetail title = TextComponentDetail.create(
+      [data['title'] ?? {}].map((d) => d as Map<String, dynamic>).toList(),
+    ).first;
+    final TextComponentDetail author = TextComponentDetail.create(
+      [data['author'] ?? {}].map((d) => d as Map<String, dynamic>).toList(),
+    ).first;
+
+    return PlayableItem(
+      id: id,
+      title: title,
+      author: author,
+      thumbnail: thumbnail,
+      duration: duration,
+      streamUrl: streamUrl,
+    );
   }
 }
 
@@ -276,5 +412,20 @@ class Profile {
       'image': image,
       'contents': contents,
     }.toString();
+  }
+
+  static Profile create(Map<String, dynamic> data) {
+    final String id = data['id'] ?? '';
+    final String name = data['name'] ?? '';
+    final String image = data['image'] ?? '';
+    final List<TextComponentDetail> about = TextComponentDetail.create(data['about'] ?? []);
+    final List<CategorizedContent> contents = ((data['contents'] ?? []) as List)
+        .map((content) => content as Map<String, dynamic>)
+        .map(
+          (content) => CategorizedContent.create(content),
+        )
+        .toList();
+
+    return Profile(id: id, name: name, about: about, image: image, contents: contents);
   }
 }
