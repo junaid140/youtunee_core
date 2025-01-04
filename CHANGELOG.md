@@ -12,3 +12,6 @@
 ## 0.0.3
 - Simplify type.
 - Create unit test.
+
+## 0.0.4
+- Implement yt-dlp to get streamUrl (more efficient);.

@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yed;
 import 'package:youtunee_core/str.dart';
 import 'package:youtunee_core/typings.dart';
 
@@ -8,7 +7,6 @@ class Youtunee {
   Youtunee({this.thumbnailSize = 512});
 
   final int thumbnailSize;
-  final _ytExplode = yed.YoutubeExplode();
   final Map<String, String> _headers = {
     'accept':
         'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
@@ -30,8 +28,7 @@ class Youtunee {
   Future<Map<String, dynamic>> getOrSetContext() async {
     if (_innertubeContext['client'] != null) return _innertubeContext;
 
-    final client = http.Client();
-    final response = await client.get(
+    final response = await http.get(
       Uri.https('music.youtube.com'),
       headers: _headers,
     );
@@ -91,8 +88,7 @@ class Youtunee {
   }
 
   Future<List<CategorizedContent>?> getFeatured() async {
-    final client = http.Client();
-    final response = await client.get(
+    final response = await http.get(
       Uri.https('music.youtube.com'),
       headers: _headers,
     );
@@ -196,8 +192,7 @@ class Youtunee {
       '/youtubei/v1/$mode',
       queryParams,
     );
-    final client = http.Client();
-    final response = await client.post(
+    final response = await http.post(
       url,
       headers: _headers,
       body: jsonEncode(requestBody),
@@ -338,7 +333,6 @@ class Youtunee {
     required String playlistId,
     String mode = 'playlist',
   }) async {
-    final client = http.Client();
     final url = mode == 'playlist'
         ? Uri.https(
             'music.youtube.com',
@@ -349,7 +343,7 @@ class Youtunee {
             'music.youtube.com',
             '/browse/$playlistId',
           );
-    final response = await client.get(
+    final response = await http.get(
       url,
       headers: _headers,
     );
@@ -500,8 +494,7 @@ class Youtunee {
       requestBody['playlistId'] = playlistId;
     }
 
-    final client = http.Client();
-    final response = await client.post(
+    final response = await http.post(
       Uri.https(
         'music.youtube.com',
         '/youtubei/v1/next',
@@ -566,8 +559,7 @@ class Youtunee {
       'browseId': browseId,
     };
 
-    final client = http.Client();
-    final response = await client.post(
+    final response = await http.post(
       Uri.parse(
         'https://music.youtube.com/youtubei/v1/browse?prettyPrint=false',
       ),
@@ -595,8 +587,7 @@ class Youtunee {
       'videoId': itemId,
     };
 
-    final client = http.Client();
-    final response = await client.post(
+    final response = await http.post(
       Uri.https(
         'music.youtube.com',
         '/youtubei/v1/next',
@@ -625,8 +616,7 @@ class Youtunee {
       'videoId': itemId,
     };
 
-    final client = http.Client();
-    final response = await client.post(
+    final response = await http.post(
       Uri.https(
         'music.youtube.com',
         '/youtubei/v1/player',
@@ -659,15 +649,8 @@ class Youtunee {
     final item = await getContent(itemId);
     if (item == null) return null;
 
-    final manifest = await _ytExplode.videos.streams.getManifest(
-      itemId,
-      ytClients: [
-        yed.YoutubeApiClient.tv,
-        yed.YoutubeApiClient.mweb,
-      ],
-    );
-    final audio = manifest.audioOnly;
-    item.streamUrl = audio.first.url;
+    final audio = (await getPlayerUrl(itemId))?.first;
+    item.streamUrl = Uri.parse(audio ?? '');
 
     return item;
   }
@@ -679,8 +662,7 @@ class Youtunee {
       'browseId': profileId,
     };
 
-    final client = http.Client();
-    final response = await client.post(
+    final response = await http.post(
       Uri.https(
         'music.youtube.com',
         '/youtubei/v1/browse',
@@ -790,5 +772,74 @@ class Youtunee {
       image: image,
       contents: contents,
     );
+  }
+
+  Future<List<String>?> getPlayerUrl(String id, {int retryCount = 0}) async {
+    if (retryCount >= 5) return null;
+    final apikey = 'AIzaSyB-63vPrdThhKuerbB2N_l7Kwwcxj6yUAc';
+    final headers = {
+      'X-YouTube-Client-Name': '5',
+      'X-YouTube-Client-Version': '19.09.3',
+      'Origin': 'https://www.youtube.com',
+      'User-Agent': 'com.google.ios.youtube/19.09.3 (iPhone14,3; U; CPU iOS 15_6 like Mac OS X)',
+      'content-type': 'application/json'
+    };
+    final body = {
+      'videoId': id,
+      'contentCheckOk': true,
+      'racyCheckOk': true,
+      'context': {
+        'client': {
+          'clientName': 'IOS',
+          'clientVersion': '19.09.3',
+          'deviceModel': 'iPhone14,3',
+          'userAgent': 'com.google.ios.youtube/19.09.3 (iPhone14,3; U; CPU iOS 15_6 like Mac OS X)',
+          'hl': 'en',
+          'timeZone': 'UTC',
+          'utcOffsetMinutes': 0
+        }
+      },
+      'playbackContext': {
+        'contentPlaybackContext': {
+          'html5Preference': 'HTML5_PREF_WANTS',
+        }
+      },
+    };
+
+    final response = await http.post(
+      Uri.https(
+        'www.youtube.com',
+        '/youtubei/v1/player',
+        {
+          'key': apikey,
+          'prettyPrint': 'false',
+        },
+      ),
+      headers: headers,
+      body: jsonEncode(body),
+    );
+    if (response.statusCode != 200) return null;
+
+    final jsonData = jsonDecode(response.body);
+    if (jsonData['streamingData'] == null) return null;
+
+    final adaptiveUrls = (jsonData['streamingData']['adaptiveFormats'] as List)
+        .where(
+          (format) => (format['mimeType'] as String).startsWith('audio'),
+        )
+        .map((format) => format['url'] as String)
+        .toList();
+
+    List<String> availableUrls = [];
+    for (var url in adaptiveUrls) {
+      final headResponse = await http.head(Uri.parse(url));
+      if (headResponse.statusCode == 200) {
+        availableUrls.add(url);
+      }
+    }
+
+    if (availableUrls.isEmpty) return getPlayerUrl(id, retryCount: retryCount + 1);
+
+    return availableUrls;
   }
 }
