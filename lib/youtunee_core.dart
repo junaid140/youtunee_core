@@ -775,6 +775,9 @@ class Youtunee {
   }
 
   Future<List<String>?> getPlayerUrl(String id, {int retryCount = 0}) async {
+    if (retryCount > 0) {
+      print('[RETRY] Get player url: $retryCount');
+    }
     if (retryCount >= 5) return null;
     final apikey = 'AIzaSyB-63vPrdThhKuerbB2N_l7Kwwcxj6yUAc';
     final headers = {
@@ -838,7 +841,9 @@ class Youtunee {
       }
     }
 
-    if (availableUrls.isEmpty) return getPlayerUrl(id, retryCount: retryCount + 1);
+    if (availableUrls.isEmpty) {
+      return await getPlayerUrl(id, retryCount: retryCount + 1);
+    }
 
     return availableUrls;
   }
