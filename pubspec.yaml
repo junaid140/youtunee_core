@@ -4,7 +4,7 @@ version: 0.0.4
 repository: https://github.com/navetacandra/youtunee_core
 
 environment:
-  sdk: ^3.6.0
+  sdk: ^3.4.4
 
 # Add regular dependencies here.
 dependencies:
